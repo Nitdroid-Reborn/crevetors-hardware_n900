@@ -50,9 +50,12 @@
 #define ID_ACCELERATION (ID_BASE+0)
 
 #define DEFAULT_THRESHOLD 100
-#define SYSFS_PATH "/sys/class/i2c-adapter/i2c-3/3-001d/"
+//#define SYSFS_PATH "/sys/class/i2c-adapter/i2c-3/3-001d/"
+#define SYSFS_PATH "/sys/devices/platform/lis3lv02d/"
 
 static int sensor_fd = -1;
+/* store delay in us*/
+static float delay = 10000;
 
 static int
 write_string(char const *file, const char const *value)
@@ -105,6 +108,7 @@ static const struct sensor_t sensors_list[] =
         .maxRange = (GRAVITY_EARTH * 2.3f),
         .resolution = (GRAVITY_EARTH * 2.3f) / 128.0f,
         .power = 3.0f,
+        .minDelay = 10000,
         .reserved = {},
 	},
 };
@@ -118,7 +122,8 @@ static int sensors_get_list(struct sensors_module_t *module,
 
 static int sensors_set_delay_n900(struct sensors_poll_device_t *dev, int handle, int64_t ns)
 {
-    LOGD("Control set delay %lld ns is not supported and fix to 200 ms\n", ns);
+    //LOGD("Control set delay %lld ns is not supported and fix to 200 ms\n", ns);
+    delay = ns/1000;
     return 0;
 }
 
@@ -139,7 +144,7 @@ static int sensors_activate_n900(struct sensors_poll_device_t *dev, int handle, 
 {
     if (1 /*enabled*/) {
         if (sensor_fd < 0) {
-            sensor_fd = open(SYSFS_PATH "coord", O_RDONLY | O_NONBLOCK);
+            sensor_fd = open(SYSFS_PATH "position", O_RDONLY | O_NONBLOCK);
             if (sensor_fd < 0) {
                 LOGE("coord open failed in %s: %s", __FUNCTION__, strerror(errno));
                 return -1;
@@ -148,7 +153,7 @@ static int sensors_activate_n900(struct sensors_poll_device_t *dev, int handle, 
     }
 
     LOGD("%s\n", __func__);
-    write_int("ths", DEFAULT_THRESHOLD);
+    write_int("rate", DEFAULT_THRESHOLD);
 
     return 0;
 }
@@ -169,6 +174,9 @@ static int sensors_poll_n900(struct sensors_poll_device_t *dev, sensors_event_t*
     FD_ZERO(&rfds);
     FD_SET(fd, &rfds);
 
+    /* we sleep here because we know we will have something to read */
+    //LOGD("Sleeping for %lld usecs\n", delay);
+    usleep(delay);
     do {
         timeout.tv_sec = 0;
         timeout.tv_usec = 1000000;
@@ -187,11 +195,11 @@ static int sensors_poll_n900(struct sensors_poll_device_t *dev, sensors_event_t*
         return -errno;
     }
 
-    float x = 0, y = 0, z = 0;
-    sscanf(coord, "%f %f %f\n", &x, &y, &z);
-    event->acceleration.x = (-GRAVITY_EARTH * y) / 1000;
+    int x = 0, y = 0, z = 0;
+    sscanf(coord, "(%d,%d,%d)\n", &x, &y, &z);
+    event->acceleration.x = (GRAVITY_EARTH * y) / 1000;
     event->acceleration.y = (-GRAVITY_EARTH * x) / 1000;
-    event->acceleration.z = (-GRAVITY_EARTH * z) / 1000;
+    event->acceleration.z = (GRAVITY_EARTH * z) / 1000;
     event->timestamp = 0;
     event->version = sizeof(struct sensors_event_t);
     event->type = ID_ACCELERATION;

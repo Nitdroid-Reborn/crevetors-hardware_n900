@@ -46,6 +46,8 @@ static int g_backlight = 255;
 static int g_buttons = 0;
 static int g_attention = 0;
 
+static int kb_channels[6] = {1,2,3,7,8};
+
 
 char const*const LCD_FILE
         = "/sys/class/backlight/acx565akm/brightness";
@@ -54,16 +56,16 @@ char const*const LCD_BLANK_FILE
         = "/sys/devices/platform/omapfb/graphics/fb0/blank";
 
 char const*const KEYBOARD_FILE
-        = "/sys/class/leds/lp5523:kb%d/brightness";
+        = "/sys/class/leds/lp5523:channel%d/brightness";
 
 char const*const RED_LED_FILE
-        = "/sys/class/leds/lp5523:r/brightness";
+        = "/sys/class/leds/lp5523:6/brightness";
 
 char const*const GREEN_LED_FILE
-        = "/sys/class/leds/lp5523:g/brightness";
+        = "/sys/class/leds/lp5523:5/brightness";
 
 char const*const BLUE_LED_FILE
-        = "/sys/class/leds/lp5523:b/brightness";
+        = "/sys/class/leds/lp5523:4/brightness";
 
 char const*const ENGINE1_MODE_FILE
         = "/sys/class/i2c-adapter/i2c-2/2-0032/engine1_mode";
@@ -165,7 +167,7 @@ set_light_keyboard(struct light_device_t* dev,
     LOGD("%s %d\n", __func__, on);
     pthread_mutex_lock(&g_lock);
     for(i = 1; i <= 6; i++) {
-        snprintf(file, sizeof(file), KEYBOARD_FILE, i);
+        snprintf(file, sizeof(file), KEYBOARD_FILE, kb_channels[i]);
         err = write_int(file, on);
 		if (err)
 			LOGE("%s %d > %s, err=%d\n", __func__, on, file, err);
